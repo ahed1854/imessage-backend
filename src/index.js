@@ -46,7 +46,7 @@ if (fs.existsSync(publicDir)) {
     });
 }
 
-const listenPort = PORT || 5000;
+const listenPort = PORT || 3000;
 app.listen(listenPort, "localhost", () => {
     console.log(`server is running on port ${listenPort}`);
     connectDB();
