@@ -10,6 +10,7 @@ channel = "stable-25_05"
 
 [userenv.shared]
 PORT = "3000"
+FRONTEND_URL = "https://imessage-frontend-psi.vercel.app/"
 
 [workflows]
 runButton = "Project"
