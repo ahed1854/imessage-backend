@@ -51,7 +51,8 @@ if (fs.existsSync(publicDir)) {
 }
 
 const listenPort = PORT || 3000;
-app.listen(listenPort, "localhost", () => {
-    console.log(`server is running on port ${listenPort}`);
+app.listen(listenPort, "0.0.0.0", () => {
+    console.log(`🚀 Server running on http://0.0.0.0:${listenPort}`);
+    console.log(`🔗 Public URL: ${process.env.REPLIT_URL || "unknown"}`);
     connectDB();
 });
