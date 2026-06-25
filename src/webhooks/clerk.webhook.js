@@ -58,11 +58,10 @@ const router = express.Router();
 // });
 
 router.post("/", async (req, res) => {
-    console.log("✅ Webhook route hit"); // <-- confirm the route is called
+    console.log("✅ Webhook route hit"); // now you'll see this
 
     try {
         const signingSecret = process.env.CLERK_WEBHOOK_SIGNING_SECRET;
-        console.log("🔑 Signing secret exists?", !!signingSecret);
         if (!signingSecret) {
             console.error("❌ Missing signing secret");
             return res
@@ -70,119 +69,53 @@ router.post("/", async (req, res) => {
                 .json({ message: "Webhook secret is not provided" });
         }
 
-        // Log headers to see if Clerk sends the signature headers
-        console.log("📨 Headers:", req.headers);
-
         const payload = Buffer.isBuffer(req.body)
             ? req.body.toString("utf8")
             : String(req.body);
-        console.log("📦 Raw body length:", payload.length);
-
         const request = new Request("http://internal/webhooks/clerk", {
             method: "POST",
             headers: new Headers(req.headers),
             body: payload,
         });
 
-        let evt;
-        try {
-            evt = await verifyWebhook(request, { signingSecret });
-            console.log("✅ Verification succeeded, event type:", evt.type);
-        } catch (verifyError) {
-            console.error("❌ Verification failed:", verifyError.message);
-            // Log the full error to see what went wrong
-            console.error(verifyError);
-            return res
-                .status(400)
-                .json({ message: "Webhook verification failed" });
+        const evt = await verifyWebhook(request, { signingSecret });
+        console.log(`📌 Event type: ${evt.type}`);
+
+        if (evt.type === "user.created" || evt.type === "user.updated") {
+            const u = evt.data;
+            const email =
+                u.email_addresses?.find(
+                    (e) => e.id === u.primary_email_address_id,
+                )?.email_address ?? u.email_addresses?.[0]?.email_address;
+            const fullName =
+                [u.first_name, u.last_name].filter(Boolean).join(" ") ||
+                u.username ||
+                email?.split("@")[0];
+
+            console.log(
+                `📝 Saving user: clerkId=${u.id}, email=${email}, fullName=${fullName}`,
+            );
+
+            const result = await User.findOneAndUpdate(
+                { clerkId: u.id },
+                { clerkId: u.id, email, fullName, profilePic: u.image_url },
+                { new: true, upsert: true, setDefaultsOnInsert: true },
+            );
+            console.log(`✅ User saved/updated: ${result}`);
         }
 
-        // --- continue with your event handling ---
-        router.post("/", async (req, res) => {
-            console.log("✅ Webhook route hit"); // <-- confirm the route is called
-
-            try {
-                const signingSecret = process.env.CLERK_WEBHOOK_SIGNING_SECRET;
-                console.log("🔑 Signing secret exists?", !!signingSecret);
-                if (!signingSecret) {
-                    console.error("❌ Missing signing secret");
-                    return res
-                        .status(503)
-                        .json({ message: "Webhook secret is not provided" });
-                }
-
-                // Log headers to see if Clerk sends the signature headers
-                console.log("📨 Headers:", req.headers);
-
-                const payload = Buffer.isBuffer(req.body)
-                    ? req.body.toString("utf8")
-                    : String(req.body);
-                console.log("📦 Raw body length:", payload.length);
-
-                const request = new Request("http://internal/webhooks/clerk", {
-                    method: "POST",
-                    headers: new Headers(req.headers),
-                    body: payload,
-                });
-
-                let evt;
-                try {
-                    evt = await verifyWebhook(request, { signingSecret });
-                    console.log(
-                        "✅ Verification succeeded, event type:",
-                        evt.type,
-                    );
-                } catch (verifyError) {
-                    console.error(
-                        "❌ Verification failed:",
-                        verifyError.message,
-                    );
-                    // Log the full error to see what went wrong
-                    console.error(verifyError);
-                    return res
-                        .status(400)
-                        .json({ message: "Webhook verification failed" });
-                }
-
-                if (
-                    evt.type === "user.created" ||
-                    evt.type === "user.updated"
-                ) {
-                    const u = evt.data;
-
-                    const email =
-                        u.email_addresses?.find(
-                            (e) => e.id === u.primary_email_address_id,
-                        )?.email_address ??
-                        u.email_addresses?.[0]?.email_address;
-
-                    const fullName =
-                        [u.first_name, u.last_name].filter(Boolean).join(" ") ||
-                        u.username ||
-                        email?.split("@")[0];
-
-                    await User.findOneAndUpdate(
-                        { clerkId: u.id },
-                        {
-                            clerkId: u.id,
-                            email,
-                            fullName,
-                            profilePic: u.image_url,
-                        },
-                        { new: true, upsert: true, setDefaultsOnInsert: true },
-                    );
-                }
-                res.status(200).json({ received: true });
-            } catch (error) {
-                console.error("❌ Unexpected error:", error);
-                res.status(400).json({
-                    message: "Webhook verification failed",
-                });
+        if (evt.type === "user.deleted") {
+            if (evt.data.id) {
+                await User.findOneAndDelete({ clerkId: evt.data.id });
+                console.log(`🗑️ Deleted user: ${evt.data.id}`);
             }
-        });
+        }
+
         res.status(200).json({ received: true });
     } catch (error) {
-        console.error("❌ Unexpected error:", error);
+        console.error("❌ Error in Clerk webhook:", error);
+        // log full error stack
+        console.error(error);
         res.status(400).json({ message: "Webhook verification failed" });
     }
 });
