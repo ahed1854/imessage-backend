@@ -26,7 +26,7 @@ app.use(express.json());
 app.use(clerkMiddleware());
 app.use(
     cors({
-        origin: "https://imessage-frontend-psi.vercel.app/",
+        origin: process.env.FRONTEND_URL,
         credentials: true,
     }),
 );
@@ -34,6 +34,10 @@ app.use(
 // health endpoint
 app.get("/health", (req, res) => {
     res.status(200).json({ ok: true });
+});
+
+app.get("/", (req, res) => {
+    res.send("Backend is running successfully!");
 });
 
 // if public directory is there, serve the static files
