@@ -7,6 +7,7 @@ import path from "path";
 
 import { connectDB } from "./lib/db.js";
 import { clerkMiddleware } from "@clerk/express";
+import authRoutes from "./routes/auth.route.js";
 import clerkWebhook from "./webhooks/clerk.webhook.js";
 
 const app = express();
@@ -41,6 +42,8 @@ app.use(
 app.get("/health", (req, res) => {
     res.status(200).json({ ok: true });
 });
+
+app.use("/api/auth", authRoutes);
 
 app.get("/", (req, res) => {
     res.send("Backend is running successfully!");
