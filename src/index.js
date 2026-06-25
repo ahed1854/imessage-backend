@@ -7,11 +7,19 @@ import path from "path";
 
 import { connectDB } from "./lib/db.js";
 import { clerkMiddleware } from "@clerk/express";
+import clerkWebhook from "./webhooks/clerk.webhook.js";
 
 const app = express();
 const PORT = process.env.PORT;
 
 const publicDir = path.join(process.cwd(), "public");
+
+// raw is to make sure to not parse webhook event data, and keep it in the raw format
+app.use(
+    "/api/webhooks/clerk",
+    express.raw({ type: "application/json" }),
+    clerkWebhook,
+);
 
 // middlewares
 app.use(express.json());
